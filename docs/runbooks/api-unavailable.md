@@ -47,5 +47,5 @@ lists every API pod as ready.
 ## Measured
 
 Drills 03 and 04 take this path (dependency down, API pods leave the Service).
-See [docs/results/drills.md](../results/drills.md) for detection and recovery
+See the [drill results](../../README.md#failure-drills) for detection and recovery
 times.

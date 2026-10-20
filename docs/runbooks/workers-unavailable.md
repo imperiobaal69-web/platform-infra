@@ -47,4 +47,4 @@ HPA's desired count, `aj_queue_depth{state="pending"}` falls.
 ## Measured
 
 Drill 02 kills every worker mid-job and drill 05 evicts every pod under load;
-see [docs/results/drills.md](../results/drills.md).
+see the [drill results](../../README.md#failure-drills).

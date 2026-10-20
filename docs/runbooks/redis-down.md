@@ -43,6 +43,6 @@ unfinished.
 
 ## Measured
 
-Drill 04 kills Redis under load; see [docs/results/drills.md](../results/drills.md)
+Drill 04 kills Redis under load; see the [drill results](../../README.md#failure-drills)
 for the time until every waiting job finished and how many the sweeper
 re-enqueued.

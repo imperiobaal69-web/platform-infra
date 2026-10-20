@@ -49,4 +49,4 @@ shows every API pod ready, `aj_queue_oldest_unfinished_age_seconds` falls back.
 
 Drill 03 kills the Postgres pod under load. Results, including whether
 committed data was identical afterwards, are in
-[docs/results/drills.md](../results/drills.md).
+the [drill results](../../README.md#failure-drills).

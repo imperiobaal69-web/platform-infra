@@ -41,4 +41,4 @@ next kube-state-metrics scrape.
 ## Measured
 
 Drill 06 ships a release that listens on the wrong port and lets the guard
-roll it back under load; see [docs/results/drills.md](../results/drills.md).
+roll it back under load; see the [drill results](../../README.md#failure-drills).
