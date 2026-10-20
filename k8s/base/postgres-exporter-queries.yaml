@@ -1,0 +1,24 @@
+# Custom postgres_exporter queries. Metric names are <query name>_<column>.
+#
+# aj_jobs_count{status}: jobs per status (queued, running, failed = waiting
+#   for a retry, succeeded, dead).
+# aj_queue_oldest_unfinished_age_seconds: age of the oldest job that is not
+#   finished yet, 0 when there is none. This is the queue-age SLI: it grows
+#   whenever work is accepted but not completed, whatever the reason (workers
+#   down, Redis lost the queue, Postgres slow). The partial index
+#   jobs_unfinished_updated keeps the scan small.
+aj_jobs:
+  query: "SELECT status::text AS status, count(*) AS count FROM jobs GROUP BY status"
+  metrics:
+    - status:
+        usage: LABEL
+        description: Job status
+    - count:
+        usage: GAUGE
+        description: Number of jobs in this status
+aj_queue:
+  query: "SELECT COALESCE(EXTRACT(EPOCH FROM now() - min(created_at)), 0)::float8 AS oldest_unfinished_age_seconds FROM jobs WHERE status IN ('queued', 'running', 'failed')"
+  metrics:
+    - oldest_unfinished_age_seconds:
+        usage: GAUGE
+        description: Age in seconds of the oldest job not yet in a terminal state

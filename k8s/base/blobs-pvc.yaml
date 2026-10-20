@@ -1,0 +1,12 @@
+# Uploaded recordings, written by the API and read by workers. Across nodes
+# this needs ReadWriteMany (Filestore on GKE). The local overlay patches it to
+# ReadWriteOnce, which works because every pod runs on the one node.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: blobs
+spec:
+  accessModes: [ReadWriteMany]
+  resources:
+    requests:
+      storage: 100Gi

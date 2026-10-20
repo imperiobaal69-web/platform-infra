@@ -1,0 +1,88 @@
+# Local stand-in for Cloud SQL: one Postgres pod with a persistent volume.
+# Superuser credentials are only used by the init script and the drills; the
+# application connects as the audiojobs owner role, the exporter as a
+# read-only role.
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: audio-jobs-data
+  labels: {app: postgres}
+spec:
+  selector: {app: postgres}
+  ports:
+    - {name: postgres, port: 5432, targetPort: postgres}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: audio-jobs-data
+  labels: {app: postgres}
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector:
+    matchLabels: {app: postgres}
+  template:
+    metadata:
+      labels: {app: postgres}
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 70 # postgres user in the alpine image
+        runAsGroup: 70
+        fsGroup: 70
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: postgres
+          image: postgres:17.6-alpine
+          ports:
+            - {name: postgres, containerPort: 5432}
+          env:
+            - {name: PGDATA, value: /var/lib/postgresql/data/pgdata}
+            - {name: POSTGRES_DB, value: audiojobs}
+          envFrom:
+            - secretRef: {name: postgres}
+          startupProbe:
+            exec: {command: [pg_isready, -h, 127.0.0.1, -U, postgres]}
+            periodSeconds: 2
+            failureThreshold: 60
+          readinessProbe:
+            exec: {command: [pg_isready, -h, 127.0.0.1, -U, postgres]}
+            periodSeconds: 5
+          livenessProbe:
+            exec: {command: [pg_isready, -h, 127.0.0.1, -U, postgres]}
+            periodSeconds: 10
+            failureThreshold: 6
+          resources:
+            requests: {cpu: 100m, memory: 128Mi}
+            limits: {cpu: "1", memory: 512Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - {name: data, mountPath: /var/lib/postgresql/data}
+            - {name: run, mountPath: /var/run/postgresql}
+            - {name: tmp, mountPath: /tmp}
+            - {name: init, mountPath: /docker-entrypoint-initdb.d, readOnly: true}
+      volumes:
+        - name: run
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
+        - name: init
+          configMap: {name: postgres-init}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: 2Gi

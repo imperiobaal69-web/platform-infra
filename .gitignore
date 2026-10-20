@@ -1,0 +1,8 @@
+k8s/overlays/local/secrets/
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+terraform/**/backend.hcl
+drills/results/*.log
+.tools/

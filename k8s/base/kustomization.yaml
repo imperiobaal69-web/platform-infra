@@ -1,0 +1,28 @@
+# Environment-independent description of the audio-jobs workload. Overlays
+# add the datastores (or the network paths to managed ones), the secrets, the
+# image reference and the sizing.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: audio-jobs
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: audio-jobs
+    includeSelectors: false
+resources:
+  - namespace.yaml
+  - serviceaccounts.yaml
+  - config.yaml
+  - blobs-pvc.yaml
+  - migrate-job.yaml
+  - api.yaml
+  - worker.yaml
+  - postgres-exporter.yaml
+  - networkpolicies.yaml
+configMapGenerator:
+  - name: postgres-exporter-queries
+    files:
+      - queries.yaml=postgres-exporter-queries.yaml
+images:
+  - name: audio-jobs
+    newName: audio-jobs
+    newTag: local

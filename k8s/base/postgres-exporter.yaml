@@ -1,0 +1,54 @@
+# Exposes Postgres health (pg_up) and two workload signals the services do not
+# export themselves: jobs per status and the age of the oldest unfinished job
+# (the queue-age SLI). Connects as a read-only role.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-exporter
+  labels: {app: postgres-exporter}
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels: {app: postgres-exporter}
+  template:
+    metadata:
+      labels: {app: postgres-exporter}
+    spec:
+      serviceAccountName: postgres-exporter
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: exporter
+          image: quay.io/prometheuscommunity/postgres-exporter:v0.17.1
+          args:
+            - --extend.query-path=/etc/postgres-exporter/queries.yaml
+            - --no-collector.stat_bgwriter
+          ports:
+            - {name: metrics, containerPort: 9187}
+          envFrom:
+            - secretRef: {name: audio-jobs-exporter-db}
+          readinessProbe:
+            httpGet: {path: /, port: metrics}
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: {path: /, port: metrics}
+            periodSeconds: 20
+          resources:
+            requests: {cpu: 10m, memory: 24Mi}
+            limits: {cpu: 200m, memory: 64Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - {name: queries, mountPath: /etc/postgres-exporter, readOnly: true}
+      volumes:
+        - name: queries
+          configMap: {name: postgres-exporter-queries}

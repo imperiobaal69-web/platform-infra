@@ -1,0 +1,17 @@
+# Non-secret settings. Credentials live in the audio-jobs-db and
+# audio-jobs-exporter-db Secrets, which each overlay provides (see
+# docs/secrets.md).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: audio-jobs
+data:
+  REDIS_ADDR: redis:6379
+  BLOB_DIR: /data/blobs
+  MAX_ATTEMPTS: "5"
+  WORKER_CONCURRENCY: "4"
+  VISIBILITY_TIMEOUT: 30s
+  SWEEP_EVERY: 30s
+  SWEEP_IDLE: 2m
+  # Must stay below terminationGracePeriodSeconds of each Deployment.
+  SHUTDOWN_GRACE: 25s

@@ -1,0 +1,39 @@
+# Schema migrations. scripts/deploy.sh deletes the previous Job, applies this
+# one and waits for it before rolling out api and worker. The migrator takes a
+# Postgres advisory lock, so two concurrent runs are safe.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: audio-jobs-migrate
+spec:
+  backoffLimit: 6
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        app: migrate
+    spec:
+      serviceAccountName: migrate
+      automountServiceAccountToken: false
+      restartPolicy: OnFailure
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: migrate
+          image: audio-jobs
+          command: ["/usr/local/bin/migrate"]
+          envFrom:
+            - secretRef:
+                name: audio-jobs-db
+          resources:
+            requests: {cpu: 50m, memory: 32Mi}
+            limits: {cpu: 500m, memory: 128Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]

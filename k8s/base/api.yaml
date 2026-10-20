@@ -1,0 +1,120 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  labels: {app: api}
+spec:
+  # No replicas field: the HPA owns the replica count, and a fixed value here
+  # would reset it on every apply.
+  revisionHistoryLimit: 5
+  # A rollout that makes no progress for this long is marked failed;
+  # scripts/deploy.sh rolls it back.
+  progressDeadlineSeconds: 120
+  minReadySeconds: 5
+  selector:
+    matchLabels: {app: api}
+  strategy:
+    type: RollingUpdate
+    # Never drop below the current serving capacity during a rollout, so a
+    # release whose pods never become ready leaves the old ones serving.
+    rollingUpdate: {maxSurge: 1, maxUnavailable: 0}
+  template:
+    metadata:
+      labels: {app: api}
+    spec:
+      serviceAccountName: api
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: api
+          image: audio-jobs
+          command: ["/usr/local/bin/api"]
+          ports:
+            - {name: http, containerPort: 8080}
+          env:
+            - {name: HTTP_ADDR, value: ":8080"}
+            - name: CONSUMER_NAME
+              valueFrom: {fieldRef: {fieldPath: metadata.name}}
+            - name: GOMEMLIMIT
+              valueFrom: {resourceFieldRef: {resource: limits.memory}}
+          envFrom:
+            - configMapRef: {name: audio-jobs}
+            - secretRef: {name: audio-jobs-db}
+          # The process is up: give it up to 60s before liveness applies.
+          startupProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 2
+            failureThreshold: 30
+          # /readyz pings Postgres and Redis. A pod that cannot reach either
+          # leaves the Service endpoints instead of returning errors.
+          readinessProbe:
+            httpGet: {path: /readyz, port: http}
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 2
+          # Liveness does not depend on Postgres or Redis: an outage of a
+          # dependency must not restart every API pod.
+          livenessProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 10
+            failureThreshold: 3
+          lifecycle:
+            # Keep serving while the endpoint removal propagates to kube-proxy.
+            preStop:
+              sleep: {seconds: 5}
+          resources:
+            requests: {cpu: 250m, memory: 128Mi}
+            limits: {memory: 512Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - {name: blobs, mountPath: /data/blobs}
+      volumes:
+        - name: blobs
+          persistentVolumeClaim: {claimName: blobs}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api
+  labels: {app: api}
+spec:
+  selector: {app: api}
+  ports:
+    - {name: http, port: 80, targetPort: http}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: api
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels: {app: api}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: api
+spec:
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: api}
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: {type: Utilization, averageUtilization: 70}
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300

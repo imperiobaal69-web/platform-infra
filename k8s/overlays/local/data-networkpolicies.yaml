@@ -1,0 +1,48 @@
+# The datastores accept connections only from the application namespace and
+# initiate none.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: audio-jobs-data
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres-ingress
+  namespace: audio-jobs-data
+spec:
+  podSelector:
+    matchLabels: {app: postgres}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: audio-jobs}
+          podSelector:
+            matchExpressions:
+              - {key: app, operator: In, values: [api, worker, migrate, postgres-exporter]}
+      ports:
+        - {protocol: TCP, port: 5432}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: redis-ingress
+  namespace: audio-jobs-data
+spec:
+  podSelector:
+    matchLabels: {app: redis}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: audio-jobs}
+          podSelector:
+            matchExpressions:
+              - {key: app, operator: In, values: [api, worker]}
+      ports:
+        - {protocol: TCP, port: 6379}

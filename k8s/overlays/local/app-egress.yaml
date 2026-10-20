@@ -1,0 +1,38 @@
+# Egress from the application namespace to the in-cluster datastores.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-postgres
+  namespace: audio-jobs
+spec:
+  podSelector:
+    matchExpressions:
+      - {key: app, operator: In, values: [api, worker, migrate, postgres-exporter]}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: audio-jobs-data}
+          podSelector:
+            matchLabels: {app: postgres}
+      ports:
+        - {protocol: TCP, port: 5432}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-redis
+  namespace: audio-jobs
+spec:
+  podSelector:
+    matchExpressions:
+      - {key: app, operator: In, values: [api, worker]}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: audio-jobs-data}
+          podSelector:
+            matchLabels: {app: redis}
+      ports:
+        - {protocol: TCP, port: 6379}
