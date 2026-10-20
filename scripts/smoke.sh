@@ -8,7 +8,7 @@ cd "$(dirname "$0")/.."
 source scripts/lib.sh
 JOBS=${JOBS:-30}
 
-start_loadgen smoke -jobs "$JOBS" -concurrency 6 -duration-ms 5000 -timeout 2m -label smoke
+start_loadgen smoke 1 -jobs "$JOBS" -concurrency 6 -duration-ms 5000 -timeout 2m -label smoke
 report=$(wait_loadgen smoke 300)
 echo "$report"
 succeeded=$(jq -r .succeeded <<<"$report")

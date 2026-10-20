@@ -37,17 +37,20 @@ patches:
     patch: |-
       - {op: replace, path: /spec/accessModes, value: [ReadWriteOnce]}
       - {op: replace, path: /spec/resources/requests/storage, value: 2Gi}
+  # Requests follow measured usage on this VM (about 60m CPU per worker pod
+  # at 100 jobs/s), so the HPAs react at laptop-scale load. The API limit
+  # leaves room for page cache from blob writes, which counts against it.
   - target: {kind: Deployment, name: api}
     patch: |-
       - {op: replace, path: /spec/progressDeadlineSeconds, value: 60}
       - op: replace
         path: /spec/template/spec/containers/0/resources
-        value: {requests: {cpu: 100m, memory: 64Mi}, limits: {cpu: "1", memory: 256Mi}}
+        value: {requests: {cpu: 100m, memory: 64Mi}, limits: {cpu: "1", memory: 512Mi}}
   - target: {kind: Deployment, name: worker}
     patch: |-
       - op: replace
         path: /spec/template/spec/containers/0/resources
-        value: {requests: {cpu: 100m, memory: 64Mi}, limits: {cpu: "1", memory: 256Mi}}
+        value: {requests: {cpu: 50m, memory: 64Mi}, limits: {cpu: "1", memory: 256Mi}}
   - target: {kind: HorizontalPodAutoscaler, name: api}
     patch: |-
       - {op: replace, path: /spec/minReplicas, value: 2}
