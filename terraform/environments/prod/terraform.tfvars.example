@@ -1,0 +1,12 @@
+project_id = "my-gcp-project"
+region     = "europe-west1"
+
+master_authorized_networks = [
+  { name = "office-vpn", cidr = "203.0.113.0/24" },
+]
+
+# Smaller footprint for a first environment.
+node_max_count       = 2
+db_tier              = "db-custom-1-3840"
+db_high_availability = false
+redis_tier           = "BASIC"
