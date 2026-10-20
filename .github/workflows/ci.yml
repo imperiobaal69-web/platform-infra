@@ -1,0 +1,89 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  KUBERNETES_VERSION: 1.35.0
+  # The workload under test, built from its own repository at a fixed commit.
+  AUDIO_JOBS_REPO: imperiobaal69-web/audio-jobs
+  AUDIO_JOBS_REF: 9780ab2cc7f0666f7bfa479372a73666949122ac
+
+jobs:
+  lint:
+    name: shell, manifests, alert rules
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install shellcheck and kubeconform
+        run: |
+          curl -sSL https://github.com/koalaman/shellcheck/releases/download/v0.11.0/shellcheck-v0.11.0.linux.x86_64.tar.xz | tar xJ
+          sudo mv shellcheck-v0.11.0/shellcheck /usr/local/bin/
+          curl -sSL https://github.com/yannh/kubeconform/releases/download/v0.8.0/kubeconform-linux-amd64.tar.gz | tar xz
+          sudo mv kubeconform /usr/local/bin/
+      # kubectl (with kustomize built in) and jq come with the runner image;
+      # promtool runs from the Prometheus image (scripts/promtool.sh).
+      - run: scripts/check.sh shell k8s monitoring
+
+  terraform:
+    name: terraform fmt, validate, tflint, trivy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: 1.16.6
+          terraform_wrapper: false
+      - uses: terraform-linters/setup-tflint@v6
+        with:
+          tflint_version: v0.64.0
+      - name: Install trivy
+        run: |
+          curl -sSL https://github.com/aquasecurity/trivy/releases/download/v0.76.0/trivy_0.76.0_Linux-64bit.tar.gz | tar xz trivy
+          sudo mv trivy /usr/local/bin/
+      - run: scripts/check.sh terraform
+        env:
+          TFLINT_PLUGIN_DIR: ${{ runner.temp }}/tflint-plugins
+          GITHUB_TOKEN: ${{ github.token }}
+
+  e2e:
+    name: deploy to kind and smoke test
+    needs: [lint]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7
+        with:
+          repository: ${{ env.AUDIO_JOBS_REPO }}
+          ref: ${{ env.AUDIO_JOBS_REF }}
+          path: .workload
+      - name: Build the workload image
+        run: docker build -t audio-jobs:local .workload
+      - name: Create kind cluster
+        run: |
+          curl -sSLo kind https://github.com/kubernetes-sigs/kind/releases/download/v0.33.0/kind-linux-amd64
+          chmod +x kind && sudo mv kind /usr/local/bin/
+          # kindnet enforces NetworkPolicy, so the default-deny policies are
+          # exercised here too.
+          kind create cluster --name ci --wait 120s \
+            --image kindest/node:v1.35.8@sha256:07b2536e30b803ed61d1677a79df6115f798ce64c80f9e22f6ed45afd09323c0
+          kind load docker-image audio-jobs:local --name ci
+      - name: Deploy the local overlay
+        run: scripts/deploy.sh local
+      - name: Smoke test (jobs through the API, processed by workers)
+        run: scripts/smoke.sh
+      - name: Diagnostics
+        if: failure()
+        run: |
+          kubectl get pods,jobs,events -A -o wide || true
+          kubectl -n audio-jobs logs -l 'app in (api,worker)' --tail=100 --prefix || true
+          kubectl -n audio-jobs logs job/audio-jobs-migrate --tail=100 || true
+          kubectl -n loadtest logs -l app=loadgen --all-containers --tail=100 --prefix || true
