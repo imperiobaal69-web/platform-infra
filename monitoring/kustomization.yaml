@@ -1,0 +1,17 @@
+# Workload monitoring objects. Requires the prometheus-operator CRDs, so it is
+# applied after kube-prometheus-stack (scripts/monitoring-up.sh).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: monitoring
+resources:
+  - podmonitors.yaml
+  - probe.yaml
+  - rules/prometheusrule.yaml
+configMapGenerator:
+  - name: grafana-dashboard-audio-jobs
+    files:
+      - dashboards/audio-jobs.json
+    options:
+      disableNameSuffixHash: true
+      labels:
+        grafana_dashboard: "1"

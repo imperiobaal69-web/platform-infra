@@ -1,0 +1,243 @@
+# promtool unit tests: promtool test rules monitoring/tests/audio-jobs.test.yml
+rule_files:
+  - ../rules/audio-jobs.rules.yml
+
+evaluation_interval: 30s
+
+tests:
+  # Availability: an outage after an hour of healthy probes trips the fast
+  # burn-rate alert and the symptom alert; before it, nothing fires.
+  - interval: 1m
+    input_series:
+      - series: 'probe_success{job="audio-jobs-api-probe", instance="api"}'
+        values: '1x60 0x70'
+    alert_rule_test:
+      - eval_time: 50m
+        alertname: AudioJobsAvailabilityBudgetBurn
+        exp_alerts: []
+      - eval_time: 50m
+        alertname: AudioJobsAPIDown
+        exp_alerts: []
+      - eval_time: 130m
+        alertname: AudioJobsAvailabilityBudgetBurn
+        exp_alerts:
+          - exp_labels: {severity: page, slo: availability, job: audio-jobs-api-probe, instance: api}
+            exp_annotations:
+              summary: API availability is burning its 30-day error budget too fast
+              description: "100% of availability probes are failing (budget 0.5%)."
+              runbook_url: https://github.com/imperiobaal69-web/platform-infra/blob/main/docs/runbooks/error-budget-burn.md
+      - eval_time: 130m
+        alertname: AudioJobsAPIDown
+        exp_alerts:
+          - exp_labels: {severity: page, job: audio-jobs-api-probe, instance: api}
+            exp_annotations:
+              summary: Every availability probe through the API Service failed for 2 minutes
+              runbook_url: https://github.com/imperiobaal69-web/platform-infra/blob/main/docs/runbooks/api-unavailable.md
+
+  # A single failed probe (one scrape) burns almost nothing: no page.
+  - interval: 1m
+    input_series:
+      - series: 'probe_success{job="audio-jobs-api-probe", instance="api"}'
+        values: '1x60 0 1x10'
+    alert_rule_test:
+      - eval_time: 130m
+        alertname: AudioJobsAvailabilityBudgetBurn
+        exp_alerts: []
+      - eval_time: 70m
+        alertname: AudioJobsAPIDown
+        exp_alerts: []
+
+  # Job success: 5 of every 105 jobs dying (4.8%) is above the 1.44% fast
+  # burn threshold and also dead-letters jobs.
+  - interval: 1m
+    input_series:
+      - series: 'aj_jobs_finished_total{status="succeeded"}'
+        values: '0+100x120'
+      - series: 'aj_jobs_finished_total{status="dead"}'
+        values: '0+5x120'
+    alert_rule_test:
+      - eval_time: 120m
+        alertname: AudioJobsJobSuccessBudgetBurn
+        exp_alerts:
+          - exp_labels: {severity: page, slo: job-success}
+            exp_annotations:
+              summary: Jobs are dying fast enough to burn the job-success error budget
+              description: "4.762% of finished jobs ended dead (budget 0.1%)."
+              runbook_url: https://github.com/imperiobaal69-web/platform-infra/blob/main/docs/runbooks/job-failures.md
+      - eval_time: 120m
+        alertname: AudioJobsDeadLetters
+        exp_alerts:
+          - exp_labels: {severity: ticket, status: dead}
+            exp_annotations:
+              summary: Jobs exhausted their retries and were dead-lettered
+              runbook_url: https://github.com/imperiobaal69-web/platform-infra/blob/main/docs/runbooks/job-failures.md
+
+  # Job success: one dead job per 1000 is inside the budget; it still opens a
+  # dead-letter ticket but does not page.
+  - interval: 1m
+    input_series:
+      - series: 'aj_jobs_finished_total{status="succeeded"}'
+        values: '0+1000x120'
+      - series: 'aj_jobs_finished_total{status="dead"}'
+        values: '0+1x120'
+    alert_rule_test:
+      - eval_time: 120m
+        alertname: AudioJobsJobSuccessBudgetBurn
+        exp_alerts: []
+
+  # Latency: every job takes between 5.12 s and 10.24 s.
+  - interval: 1m
+    input_series:
+      - series: 'aj_job_end_to_end_seconds_bucket{le="2.56"}'
+        values: '0x40'
+      - series: 'aj_job_end_to_end_seconds_bucket{le="5.12"}'
+        values: '0x40'
+      - series: 'aj_job_end_to_end_seconds_bucket{le="10.24"}'
+        values: '0+10x40'
+      - series: 'aj_job_end_to_end_seconds_bucket{le="+Inf"}'
+        values: '0+10x40'
+      - series: 'aj_job_end_to_end_seconds_count'
+        values: '0+10x40'
+    promql_expr_test:
+      - expr: sli:job_e2e_within_slo:ratio_rate10m
+        eval_time: 30m
+        exp_samples:
+          - labels: 'sli:job_e2e_within_slo:ratio_rate10m'
+            value: 0
+    alert_rule_test:
+      - eval_time: 8m
+        alertname: AudioJobsLatencyP95High
+        exp_alerts: []
+      - eval_time: 30m
+        alertname: AudioJobsLatencyP95High
+        exp_alerts:
+          - exp_labels: {severity: page, slo: latency}
+            exp_annotations:
+              summary: p95 end-to-end job latency is above 5.12 s
+              description: "p95 over the last 10 minutes is 9.984s."
+              runbook_url: https://github.com/imperiobaal69-web/platform-infra/blob/main/docs/runbooks/job-latency.md
+
+  # Latency: fast jobs never alert.
+  - interval: 1m
+    input_series:
+      - series: 'aj_job_end_to_end_seconds_bucket{le="2.56"}'
+        values: '0+10x40'
+      - series: 'aj_job_end_to_end_seconds_bucket{le="5.12"}'
+        values: '0+10x40'
+      - series: 'aj_job_end_to_end_seconds_bucket{le="+Inf"}'
+        values: '0+10x40'
+      - series: 'aj_job_end_to_end_seconds_count'
+        values: '0+10x40'
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: AudioJobsLatencyP95High
+        exp_alerts: []
+
+  # Queue age: the oldest unfinished job keeps getting older.
+  - interval: 1m
+    input_series:
+      - series: 'aj_queue_oldest_unfinished_age_seconds{instance="exporter"}'
+        values: '0x5 600x10'
+    alert_rule_test:
+      - eval_time: 7m
+        alertname: AudioJobsQueueAgeHigh
+        exp_alerts: []
+      - eval_time: 15m
+        alertname: AudioJobsQueueAgeHigh
+        exp_alerts:
+          - exp_labels: {severity: page, slo: queue-age}
+            exp_annotations:
+              summary: An accepted job has been unfinished for more than 2 minutes
+              description: "Oldest unfinished job is 10m 0s old."
+              runbook_url: https://github.com/imperiobaal69-web/platform-infra/blob/main/docs/runbooks/queue-age.md
+
+  # Postgres unreachable, and the exporter disappearing altogether.
+  - interval: 30s
+    input_series:
+      - series: 'pg_up{instance="exporter"}'
+        values: '1x4 0x6'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: AudioJobsPostgresDown
+        exp_alerts: []
+      - eval_time: 5m
+        alertname: AudioJobsPostgresDown
+        exp_alerts:
+          - exp_labels: {severity: page}
+            exp_annotations:
+              summary: postgres-exporter cannot reach Postgres (or is not reporting)
+              runbook_url: https://github.com/imperiobaal69-web/platform-infra/blob/main/docs/runbooks/postgres-down.md
+  - interval: 30s
+    input_series:
+      - series: 'up{job="other"}'
+        values: '1x10'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: AudioJobsPostgresDown
+        exp_alerts:
+          - exp_labels: {severity: page}
+            exp_annotations:
+              summary: postgres-exporter cannot reach Postgres (or is not reporting)
+              runbook_url: https://github.com/imperiobaal69-web/platform-infra/blob/main/docs/runbooks/postgres-down.md
+
+  # Kubernetes-state alerts.
+  - interval: 30s
+    input_series:
+      - series: 'kube_statefulset_status_replicas_ready{namespace="audio-jobs-data", statefulset="redis"}'
+        values: '1x2 0x6'
+      - series: 'kube_deployment_status_replicas_available{namespace="audio-jobs", deployment="worker"}'
+        values: '2x2 0x6'
+      - series: 'kube_deployment_status_condition{namespace="audio-jobs", deployment="api", condition="Progressing", status="false"}'
+        values: '0x2 1x6'
+      - series: 'kube_pod_container_status_restarts_total{namespace="audio-jobs", pod="worker-abc", container="worker"}'
+        values: '0x2 1 2 3 4 5 6'
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: AudioJobsRedisDown
+        exp_alerts:
+          - exp_labels: {severity: page, namespace: audio-jobs-data, statefulset: redis}
+            exp_annotations:
+              summary: The Redis pod is not ready
+              runbook_url: https://github.com/imperiobaal69-web/platform-infra/blob/main/docs/runbooks/redis-down.md
+      - eval_time: 2m
+        alertname: AudioJobsWorkersUnavailable
+        exp_alerts: []
+      - eval_time: 4m
+        alertname: AudioJobsWorkersUnavailable
+        exp_alerts:
+          - exp_labels: {severity: page, namespace: audio-jobs, deployment: worker}
+            exp_annotations:
+              summary: No worker pod is available; jobs are being accepted but not processed
+              runbook_url: https://github.com/imperiobaal69-web/platform-infra/blob/main/docs/runbooks/workers-unavailable.md
+      - eval_time: 2m
+        alertname: AudioJobsRolloutStuck
+        exp_alerts:
+          - exp_labels: {severity: ticket, namespace: audio-jobs, deployment: api, condition: Progressing, status: "false"}
+            exp_annotations:
+              summary: "Rollout of api exceeded its progress deadline"
+              runbook_url: https://github.com/imperiobaal69-web/platform-infra/blob/main/docs/runbooks/bad-deploy.md
+      - eval_time: 4m
+        alertname: AudioJobsPodCrashLooping
+        exp_alerts:
+          - exp_labels: {severity: ticket, namespace: audio-jobs, pod: worker-abc, container: worker}
+            exp_annotations:
+              summary: "worker-abc restarted more than 3 times in 10 minutes"
+              runbook_url: https://github.com/imperiobaal69-web/platform-infra/blob/main/docs/runbooks/workers-unavailable.md
+
+  - interval: 1m
+    input_series:
+      - series: 'kube_horizontalpodautoscaler_status_current_replicas{namespace="audio-jobs", horizontalpodautoscaler="worker"}'
+        values: '2x5 8x20'
+      - series: 'kube_horizontalpodautoscaler_spec_max_replicas{namespace="audio-jobs", horizontalpodautoscaler="worker"}'
+        values: '8x25'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: AudioJobsHPAAtMaximum
+        exp_alerts: []
+      - eval_time: 24m
+        alertname: AudioJobsHPAAtMaximum
+        exp_alerts:
+          - exp_labels: {severity: ticket, namespace: audio-jobs, horizontalpodautoscaler: worker}
+            exp_annotations:
+              summary: "worker has been at its replica ceiling for 15 minutes"
+              runbook_url: https://github.com/imperiobaal69-web/platform-infra/blob/main/docs/runbooks/capacity.md

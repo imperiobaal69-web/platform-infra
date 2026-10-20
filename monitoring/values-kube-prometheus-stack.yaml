@@ -1,0 +1,80 @@
+# kube-prometheus-stack, sized for a single-node laptop cluster. On GKE the
+# same chart runs with persistent storage and a real Alertmanager receiver
+# (see docs/observability.md).
+
+# k3s and kind do not expose these control-plane endpoints to scrapes.
+kubeEtcd: {enabled: false}
+kubeControllerManager: {enabled: false}
+kubeScheduler: {enabled: false}
+kubeProxy: {enabled: false}
+
+defaultRules:
+  create: true
+  rules:
+    etcd: false
+    kubeControllerManager: false
+    kubeSchedulerAlerting: false
+    kubeSchedulerRecording: false
+    kubeProxy: false
+
+prometheus:
+  prometheusSpec:
+    scrapeInterval: 15s
+    evaluationInterval: 15s
+    retention: 2d
+    retentionSize: 1GB
+    # Pick up PodMonitors, Probes and PrometheusRules from any release, not
+    # only objects labelled for this Helm release.
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    probeSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+    resources:
+      requests: {cpu: 100m, memory: 400Mi}
+      limits: {cpu: "1", memory: 1Gi}
+
+alertmanager:
+  alertmanagerSpec:
+    retention: 24h
+    resources:
+      requests: {cpu: 10m, memory: 32Mi}
+      limits: {cpu: 100m, memory: 64Mi}
+  config:
+    route:
+      receiver: "null"
+      group_by: [alertname, namespace]
+      routes:
+        - receiver: "null"
+          matchers: [alertname = "Watchdog"]
+    receivers:
+      # Locally alerts are inspected in the UI and recorded by the drills.
+      # In a real environment this is PagerDuty for severity=page and a
+      # ticket queue for severity=ticket.
+      - name: "null"
+
+grafana:
+  persistence: {enabled: false}
+  resources:
+    requests: {cpu: 20m, memory: 96Mi}
+    limits: {cpu: 500m, memory: 256Mi}
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+      searchNamespace: ALL
+  defaultDashboardsEnabled: true
+
+kube-state-metrics:
+  resources:
+    requests: {cpu: 10m, memory: 32Mi}
+    limits: {cpu: 200m, memory: 128Mi}
+
+prometheus-node-exporter:
+  resources:
+    requests: {cpu: 10m, memory: 16Mi}
+    limits: {cpu: 200m, memory: 64Mi}
+
+prometheusOperator:
+  resources:
+    requests: {cpu: 10m, memory: 48Mi}
+    limits: {cpu: 200m, memory: 128Mi}

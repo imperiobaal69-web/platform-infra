@@ -1,0 +1,44 @@
+# PodMonitors rather than ServiceMonitors: workers have no Service, and
+# scraping every pod directly keeps per-pod series (in-flight jobs, restarts)
+# visible.
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: audio-jobs-api
+spec:
+  namespaceSelector:
+    matchNames: [audio-jobs]
+  selector:
+    matchLabels: {app: api}
+  podMetricsEndpoints:
+    - port: http
+      path: /metrics
+      interval: 15s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: audio-jobs-worker
+spec:
+  namespaceSelector:
+    matchNames: [audio-jobs]
+  selector:
+    matchLabels: {app: worker}
+  podMetricsEndpoints:
+    - port: metrics
+      path: /metrics
+      interval: 15s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: audio-jobs-postgres-exporter
+spec:
+  namespaceSelector:
+    matchNames: [audio-jobs]
+  selector:
+    matchLabels: {app: postgres-exporter}
+  podMetricsEndpoints:
+    - port: metrics
+      path: /metrics
+      interval: 15s

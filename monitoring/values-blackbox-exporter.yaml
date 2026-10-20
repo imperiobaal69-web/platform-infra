@@ -1,0 +1,15 @@
+# Synthetic availability probe: Prometheus asks the blackbox exporter to GET
+# the API's /readyz through its Service every 10s (see probe.yaml). /readyz
+# succeeds only when the API can reach Postgres and Redis, so the probe
+# measures "a client could submit a job right now".
+config:
+  modules:
+    http_2xx:
+      prober: http
+      timeout: 5s
+      http:
+        valid_status_codes: [200]
+        preferred_ip_protocol: ip4
+resources:
+  requests: {cpu: 10m, memory: 16Mi}
+  limits: {cpu: 100m, memory: 64Mi}

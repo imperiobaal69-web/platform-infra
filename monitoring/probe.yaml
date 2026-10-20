@@ -1,0 +1,16 @@
+apiVersion: monitoring.coreos.com/v1
+kind: Probe
+metadata:
+  name: audio-jobs-api-availability
+spec:
+  jobName: audio-jobs-api-probe
+  interval: 10s
+  module: http_2xx
+  prober:
+    url: blackbox-exporter-prometheus-blackbox-exporter.monitoring.svc:9115
+  targets:
+    staticConfig:
+      static:
+        - http://api.audio-jobs.svc.cluster.local/readyz
+      labels:
+        service: audio-jobs-api
