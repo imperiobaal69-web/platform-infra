@@ -1,0 +1,58 @@
+# GKE (regional, private) built by terraform/environments/prod. Postgres is
+# Cloud SQL reached through the Cloud SQL Auth Proxy with IAM authentication,
+# Redis is Memorystore, uploads live on Filestore, and every component runs
+# as its own Google service account through Workload Identity.
+#
+# Not applied anywhere: CI builds it with kustomize and validates the output
+# with kubeconform. The values in environment.env are what
+# `terraform output` prints for the example tfvars; replace them for a real
+# project (see README, "Deploying to GKE").
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+  - egress.yaml
+secretGenerator:
+  # DATABASE_URL carries no password: the proxy authenticates as the pod's
+  # Google service account (IAM database authentication). The Secret exists
+  # because the base reads the URL from one; nothing in it is sensitive.
+  - name: audio-jobs-db
+    namespace: audio-jobs
+    envs: [database.env]
+  - name: audio-jobs-exporter-db
+    namespace: audio-jobs
+    envs: [exporter-database.env]
+patches:
+  - path: workload-identity.yaml
+  - path: cloudsql-proxy.yaml
+    target: {kind: Deployment, name: "api|worker|postgres-exporter"}
+  - path: cloudsql-proxy.yaml
+    target: {kind: Job, name: audio-jobs-migrate}
+  - target: {kind: ConfigMap, name: audio-jobs}
+    patch: |-
+      - {op: replace, path: /data/REDIS_ADDR, value: "10.100.0.3:6379"}
+  # Filestore (basic HDD) through the GKE Filestore CSI driver; 1 TiB is
+  # the smallest basic HDD instance.
+  - target: {kind: PersistentVolumeClaim, name: blobs}
+    patch: |-
+      - {op: add, path: /spec/storageClassName, value: standard-rwx}
+      - {op: replace, path: /spec/resources/requests/storage, value: 1Ti}
+  # Spread replicas over the region's zones so one zone outage leaves
+  # capacity in the others.
+  - target: {kind: Deployment, name: api}
+    patch: |-
+      - op: add
+        path: /spec/template/spec/topologySpreadConstraints
+        value:
+          - {maxSkew: 1, topologyKey: topology.kubernetes.io/zone, whenUnsatisfiable: ScheduleAnyway, labelSelector: {matchLabels: {app: api}}}
+  - target: {kind: Deployment, name: worker}
+    patch: |-
+      - op: add
+        path: /spec/template/spec/topologySpreadConstraints
+        value:
+          - {maxSkew: 1, topologyKey: topology.kubernetes.io/zone, whenUnsatisfiable: ScheduleAnyway, labelSelector: {matchLabels: {app: worker}}}
+images:
+  - name: audio-jobs
+    newName: europe-west1-docker.pkg.dev/my-gcp-project/audio-jobs/audio-jobs
+    # scripts/deploy.sh pins the digest CI pushed (kustomize edit set image).
+    newTag: latest
