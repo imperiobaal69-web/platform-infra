@@ -1,0 +1,50 @@
+{
+  "drill": "05-eviction",
+  "title": "Evict every api and worker pod (drain), PDBs enforced",
+  "started_at": "2026-10-20T18:22:32Z",
+  "fault": "4 pods evicted through the Eviction API under load",
+  "detection_signal": "n/a (planned disruption; PDBs pace it)",
+  "detection_s": null,
+  "recovery_criterion": "all evicted pods replaced and ready",
+  "recovery_s": 11.1,
+  "jobs_accepted": 2400,
+  "jobs_lost": 0,
+  "client_errors": 0,
+  "alerts": [
+    {
+      "alert": "AudioJobsAvailabilityBudgetBurnSlow",
+      "first_pending_s": null,
+      "first_firing_s": 0.0,
+      "firing_before_fault": true
+    },
+    {
+      "alert": "AudioJobsAvailabilityBudgetBurn",
+      "first_pending_s": null,
+      "first_firing_s": 0.0,
+      "firing_before_fault": true
+    }
+  ],
+  "runbook": "docs/runbooks/workers-unavailable.md",
+  "details": {
+    "evictions_refused_by_pdb": 4,
+    "all_evictions_accepted_s": 4.6
+  },
+  "loadgen": {
+    "pods": 1,
+    "jobs": 2400,
+    "succeeded": 2400,
+    "dead": 0,
+    "submit_errors": 0,
+    "timed_out": 0,
+    "integrity_failed": 0,
+    "retried": 0,
+    "wall_seconds": 120.052669567,
+    "throughput_jobs_per_sec": 19.991225590036446,
+    "submit_p99_ms": 3.4,
+    "e2e_p50_ms": 1.3,
+    "e2e_p95_ms": 2.3,
+    "e2e_p99_ms": 4.2,
+    "accepted": 2400,
+    "lost": 0
+  }
+}

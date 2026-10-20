@@ -1,0 +1,60 @@
+{
+  "drill": "04-redis-restart",
+  "title": "Restart Redis without persistence (queue lost)",
+  "started_at": "2026-10-20T18:30:37Z",
+  "fault": "redis-0 killed (sigkill), kept down 30s, restarts with an empty dataset",
+  "detection_signal": "first API pod fails readiness and leaves the Service",
+  "detection_s": 9.1,
+  "recovery_criterion": "every job accepted before and during the outage has finished",
+  "recovery_s": 63.4,
+  "jobs_accepted": 2400,
+  "jobs_lost": 0,
+  "client_errors": 0,
+  "alerts": [
+    {
+      "alert": "AudioJobsRedisDown",
+      "first_pending_s": 20.6,
+      "first_firing_s": null,
+      "firing_before_fault": false
+    },
+    {
+      "alert": "AudioJobsAvailabilityBudgetBurnSlow",
+      "first_pending_s": null,
+      "first_firing_s": 0.4,
+      "firing_before_fault": true
+    },
+    {
+      "alert": "AudioJobsAvailabilityBudgetBurn",
+      "first_pending_s": null,
+      "first_firing_s": 0.4,
+      "firing_before_fault": true
+    }
+  ],
+  "runbook": "docs/runbooks/redis-down.md",
+  "details": {
+    "kill_method": "sigkill",
+    "held_down_s": 30,
+    "redis_ready_s": 31.3,
+    "api_back_in_service_s": 34.6,
+    "jobs_reenqueued_by_sweeper": 1,
+    "unfinished_jobs_after_drain": 0
+  },
+  "loadgen": {
+    "pods": 1,
+    "jobs": 2400,
+    "succeeded": 2400,
+    "dead": 0,
+    "submit_errors": 0,
+    "timed_out": 0,
+    "integrity_failed": 0,
+    "retried": 0,
+    "wall_seconds": 151.0528703,
+    "throughput_jobs_per_sec": 15.88847663227754,
+    "submit_p99_ms": 31700.6,
+    "e2e_p50_ms": 1.3,
+    "e2e_p95_ms": 2.2,
+    "e2e_p99_ms": 4.1,
+    "accepted": 2400,
+    "lost": 0
+  }
+}

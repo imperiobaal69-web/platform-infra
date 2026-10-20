@@ -1,0 +1,39 @@
+{
+  "drill": "02-worker-kill",
+  "title": "Kill all worker pods mid-job",
+  "started_at": "2026-10-20T17:16:10Z",
+  "fault": "2 worker pods force-deleted with 7 jobs in flight",
+  "detection_signal": "replacement worker pod ready",
+  "detection_s": 3.5,
+  "recovery_criterion": "every job in flight at the kill has succeeded",
+  "recovery_s": 38.6,
+  "jobs_accepted": 150,
+  "jobs_lost": 0,
+  "client_errors": 0,
+  "alerts": [],
+  "runbook": "docs/runbooks/workers-unavailable.md",
+  "details": {
+    "jobs_in_flight_at_kill": 7,
+    "interrupted_jobs_retried": 7,
+    "first_orphan_restarted_s": 23.8,
+    "job_processing_delay": "5s"
+  },
+  "loadgen": {
+    "pods": 1,
+    "jobs": 150,
+    "succeeded": 150,
+    "dead": 0,
+    "submit_errors": 0,
+    "timed_out": 0,
+    "integrity_failed": 0,
+    "retried": 8,
+    "wall_seconds": 106.648770075,
+    "throughput_jobs_per_sec": 1.406485980987062,
+    "submit_p99_ms": 8.7,
+    "e2e_p50_ms": 5020.8,
+    "e2e_p95_ms": 8106.2,
+    "e2e_p99_ms": 38734.4,
+    "accepted": 150,
+    "lost": 0
+  }
+}

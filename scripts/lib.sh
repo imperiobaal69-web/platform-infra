@@ -170,12 +170,16 @@ watch_alerts() {
   done
 }
 
-# alerts_summary <file>: JSON list of {alert, first_pending_s, first_firing_s}.
+# alerts_summary <file>: JSON list of {alert, first_pending_s, first_firing_s,
+# firing_before_fault}. firing_before_fault marks alerts already firing when
+# the fault was injected (the slow burn-rate windows still hold earlier
+# incidents); they say nothing about this drill's fault.
 alerts_summary() {
   [[ -s $1 ]] || { echo '[]'; return; }
   awk '{ k = $2; if ($3 == "pending" && !(k in p)) p[k] = $1; if ($3 == "firing" && !(k in f)) f[k] = $1; seen[k] = 1 }
        END { for (k in seen) printf "%s %s %s\n", k, (k in p ? p[k] : "null"), (k in f ? f[k] : "null") }' "$1" |
-    jq -R -s 'split("\n") | map(select(length > 0) | split(" ") | {alert: .[0], first_pending_s: (.[1] | fromjson), first_firing_s: (.[2] | fromjson)})'
+    jq -R -s 'split("\n") | map(select(length > 0) | split(" ") | {alert: .[0], first_pending_s: (.[1] | fromjson), first_firing_s: (.[2] | fromjson)}
+      | . + {firing_before_fault: (.first_pending_s == null and .first_firing_s != null and .first_firing_s < 5)})'
 }
 
 ready_replicas() {
@@ -214,4 +218,48 @@ wait_steady() {
 write_result() {
   jq . <<<"$2" >"$1"
   log "wrote $1"
+}
+
+# kill_method <statefulset>: how kill_and_hold will kill the pod's container.
+# "sigkill" when the container runs on a Docker runtime this shell can reach
+# (Colima's k3s uses the VM's Docker), otherwise "force-delete". A pod
+# delete, even with --grace-period=0, sends SIGTERM first, and Postgres
+# then shuts down cleanly in under a second: that is not a crash.
+kill_method() {
+  local id
+  id=$(kubectl -n "$DATA_NS" get pod "$1-0" -o jsonpath='{.status.containerStatuses[0].containerID}')
+  if [[ $id == docker://* ]] && docker inspect "${id#docker://}" >/dev/null 2>&1; then
+    echo sigkill
+  else
+    echo force-delete
+  fi
+}
+
+# kill_and_hold <statefulset> <hold_s> <t0_file>: kills the StatefulSet's only pod
+# (SIGKILL where kill_method allows) and keeps it from starting again for
+# <hold_s> seconds, then lets it come back on the same volume. The node is
+# cordoned during the hold so the replacement pod stays Pending: a datastore
+# that is back within a few seconds never fails the API readiness probe
+# (10s), which is a different, easier incident. Cordoning does not evict
+# running pods; only pods created during the hold wait. Writes the kill time
+# (epoch ms) to <t0_file>.
+kill_and_hold() {
+  local sts=$1 hold=$2 t0_file=$3 node id method
+  node=$(kubectl -n "$DATA_NS" get pod "$sts-0" -o jsonpath='{.spec.nodeName}')
+  id=$(kubectl -n "$DATA_NS" get pod "$sts-0" -o jsonpath='{.status.containerStatuses[0].containerID}')
+  kubectl cordon "$node" >/dev/null
+  # shellcheck disable=SC2064 # expand $node now
+  trap "kubectl uncordon '$node' >/dev/null" EXIT
+  method=$(kill_method "$sts")
+  now_ms >"$t0_file.tmp"
+  if [[ $method == sigkill ]]; then
+    # Delete right after the kill so the kubelet does not restart the
+    # container in place before the hold.
+    docker kill --signal KILL "${id#docker://}" >/dev/null
+  fi
+  kubectl -n "$DATA_NS" delete pod "$sts-0" --grace-period=0 --force --wait=false >/dev/null 2>&1
+  mv "$t0_file.tmp" "$t0_file"
+  sleep "$hold"
+  kubectl uncordon "$node" >/dev/null
+  trap - EXIT
 }
