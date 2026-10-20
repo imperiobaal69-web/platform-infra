@@ -11,12 +11,12 @@ fires both when processing is slow and when work is piling up.
 
 Open the dashboard and compare three panels:
 
-1. **Queue depth by state.** `lag` growing means workers are not keeping up
+1. Queue depth by state. `lag` growing means workers are not keeping up
    → capacity. `delayed` growing means jobs are failing and being retried
    with backoff → [job-failures.md](job-failures.md).
-2. **CPU per pod.** Workers at their CPU limit, HPA at maximum →
+2. CPU per pod. Workers at their CPU limit, HPA at maximum →
    [capacity.md](capacity.md).
-3. **Recovery mechanisms.** `reclaimed` or `re-enqueued by sweeper` rising
+3. Recovery mechanisms. `reclaimed` or `re-enqueued by sweeper` rising
    means jobs were orphaned by crashed workers or a lost queue; those wait
    for `VISIBILITY_TIMEOUT` or `SWEEP_IDLE` before running again, which
    shows up as latency → [workers-unavailable.md](workers-unavailable.md),

@@ -11,8 +11,8 @@ Infrastructure to deploy, monitor, scale and recover [audio-jobs](https://github
 
 What is real and what is not:
 
-- **Real, and measured here.** Everything in the local overlay runs on a single-node Kubernetes cluster (Colima with k3s on a MacBook, 4 vCPU, 6 GiB, 20 GiB disk, Kubernetes 1.35). All numbers in this README come from the drill scripts in `drills/` and are recorded in `drills/results/`.
-- **Written, validated, never applied.** The Terraform and the `gke` overlay describe a production-style GCP environment. CI runs `terraform fmt`, `validate`, tflint and trivy on the Terraform and kubeconform on the overlay, but there is no GCP project behind it. Nothing has been created in the cloud, and none of the cloud-specific behaviour (Cloud SQL failover, Workload Identity, Filestore) has been exercised.
+- Real, and measured here. Everything in the local overlay runs on a single-node Kubernetes cluster (Colima with k3s on a MacBook, 4 vCPU, 6 GiB, 20 GiB disk, Kubernetes 1.35). All numbers in this README come from the drill scripts in `drills/` and are recorded in `drills/results/`.
+- Written, validated, never applied. The Terraform and the `gke` overlay describe a production-style GCP environment. CI runs `terraform fmt`, `validate`, tflint and trivy on the Terraform and kubeconform on the overlay, but there is no GCP project behind it. Nothing has been created in the cloud, and none of the cloud-specific behaviour (Cloud SQL failover, Workload Identity, Filestore) has been exercised.
 
 ## Architecture
 
@@ -116,11 +116,11 @@ Grafana: `kubectl -n monitoring port-forward svc/kube-prometheus-stack-grafana 3
 
 Each drill is a Bash script (`set -euo pipefail`, shellcheck clean). It waits for a steady state, starts load from `loadgen` Jobs inside the cluster, injects one fault, measures, and writes `drills/results/<drill>.json`. The measurements:
 
-- **detection**: the time until the system itself reacts to the fault
-- **recovery**: the time until the stated criterion is met
-- **accepted / lost**: jobs the API accepted, and accepted jobs that never succeeded. This is computed by the load generator, which follows every job to a terminal state and checks its result.
-- **rejected at submit**: submissions that got an error or no answer during the outage. These were never accepted, so a client would retry them.
-- **alerts**: every `AudioJobs*` alert that went pending or firing during the drill, and when
+- detection: the time until the system itself reacts to the fault
+- recovery: the time until the stated criterion is met
+- accepted / lost: jobs the API accepted, and accepted jobs that never succeeded. This is computed by the load generator, which follows every job to a terminal state and checks its result.
+- rejected at submit: submissions that got an error or no answer during the outage. These were never accepted, so a client would retry them.
+- alerts: every `AudioJobs*` alert that went pending or firing during the drill, and when
 
 | Drill | Fault | Detection | Recovery | Accepted | Lost | Rejected at submit | Runbook |
 |---|---|---|---|---|---|---|---|
@@ -133,12 +133,12 @@ Each drill is a Bash script (`set -euo pipefail`, shellcheck clean). It waits fo
 
 What each drill showed:
 
-- **01, HPA scale-out.** Three load generators pushed 36,000 jobs at about 299 jobs/s. Workers scaled from 2 to 5 (71 s to peak) and the API from 2 to 4. Both were back at the minimum 80 s after the load stopped. The per-second replica timeline is in `drills/results/01-hpa-scale-out.timeline.csv`.
-- **02, worker kill.** Both workers were force-deleted with 7 jobs in flight. All 7 were retried by the replacement workers once their deliveries timed out, the first after 23.8 s, and all 150 jobs of the run succeeded.
-- **03, Postgres crash.** The container was SIGKILLed and kept down for 30 s. Postgres ran WAL crash recovery on restart ("database system was not properly shut down; automatic recovery in progress"). The 70,134 jobs committed before the crash were identical afterwards (same count, and the same md5 over every job's id and status). Both API pods left the Service within 11.8 s, so the outage was visible as refused connections. 69 of 2,400 submissions were rejected at submit, and every accepted job succeeded.
-- **04, Redis restart.** Redis came back empty, so the stream, the consumer group and the result cache were gone. Postgres still had every job, and the sweeper re-enqueued the ones stuck in `queued`. No submission was rejected: the API commits the job to Postgres first and accepts it even when the Redis enqueue fails, and the sweeper picks it up later.
-- **05, eviction.** All 4 api and worker pods were evicted through the Eviction API. The PodDisruptionBudgets refused 4 attempts and paced the drain. The new pods were ready 11.1 s after the first eviction, with no client errors.
-- **06, bad deploy.** The new API revision never became ready. With `maxUnavailable: 0`, the two old pods kept serving for the entire rollout (minimum ready endpoints: 2). At the 60 s progress deadline, `scripts/rollout-guard.sh` rolled back with no human involved.
+- 01, HPA scale-out. Three load generators pushed 36,000 jobs at about 299 jobs/s. Workers scaled from 2 to 5 (71 s to peak) and the API from 2 to 4. Both were back at the minimum 80 s after the load stopped. The per-second replica timeline is in `drills/results/01-hpa-scale-out.timeline.csv`.
+- 02, worker kill. Both workers were force-deleted with 7 jobs in flight. All 7 were retried by the replacement workers once their deliveries timed out, the first after 23.8 s, and all 150 jobs of the run succeeded.
+- 03, Postgres crash. The container was SIGKILLed and kept down for 30 s. Postgres ran WAL crash recovery on restart ("database system was not properly shut down; automatic recovery in progress"). The 70,134 jobs committed before the crash were identical afterwards (same count, and the same md5 over every job's id and status). Both API pods left the Service within 11.8 s, so the outage was visible as refused connections. 69 of 2,400 submissions were rejected at submit, and every accepted job succeeded.
+- 04, Redis restart. Redis came back empty, so the stream, the consumer group and the result cache were gone. Postgres still had every job, and the sweeper re-enqueued the ones stuck in `queued`. No submission was rejected: the API commits the job to Postgres first and accepts it even when the Redis enqueue fails, and the sweeper picks it up later.
+- 05, eviction. All 4 api and worker pods were evicted through the Eviction API. The PodDisruptionBudgets refused 4 attempts and paced the drain. The new pods were ready 11.1 s after the first eviction, with no client errors.
+- 06, bad deploy. The new API revision never became ready. With `maxUnavailable: 0`, the two old pods kept serving for the entire rollout (minimum ready endpoints: 2). At the 60 s progress deadline, `scripts/rollout-guard.sh` rolled back with no human involved.
 
 Alerts. In drill 03, `AudioJobsPostgresDown` went pending at 25.7 s; in drill 04, `AudioJobsRedisDown` went pending at 20.6 s. Neither fired: both have `for: 1m` and the outages lasted about 30 s. That is intended, because a page should not go out for an outage the system recovers from on its own in half a minute. Readiness detected both outages in 9 to 12 s. Each result file also lists the burn-rate alerts with `firing_before_fault: true`. Those were already firing when the drill started, because the 1h and 3d windows still contained earlier drills and an unplanned VM disk-full incident on the same day. They say nothing about the drill's own fault.
 
@@ -163,9 +163,9 @@ Error budget alerts use multiwindow burn rates (14.4x over 1h/5m and 6x over 6h/
 
 `.github/workflows/ci.yml`:
 
-- **lint**: shellcheck; kubeconform in strict mode against Kubernetes 1.35 for both overlays and, with CRD schemas, the monitoring objects; promtool rule checks and unit tests; a check that the generated PrometheusRule is up to date
-- **terraform**: `fmt -check`, `init -backend=false` and `validate` for the bootstrap and prod configurations, tflint with the Google ruleset, and `trivy config` failing on MEDIUM or higher
-- **e2e**: builds the audio-jobs image from its repository at a pinned commit, creates a kind cluster (Kubernetes 1.35.8), deploys the local overlay with `scripts/deploy.sh` and runs `scripts/smoke.sh`
+- lint: shellcheck; kubeconform in strict mode against Kubernetes 1.35 for both overlays and, with CRD schemas, the monitoring objects; promtool rule checks and unit tests; a check that the generated PrometheusRule is up to date
+- terraform: `fmt -check`, `init -backend=false` and `validate` for the bootstrap and prod configurations, tflint with the Google ruleset, and `trivy config` failing on MEDIUM or higher
+- e2e: builds the audio-jobs image from its repository at a pinned commit, creates a kind cluster (Kubernetes 1.35.8), deploys the local overlay with `scripts/deploy.sh` and runs `scripts/smoke.sh`
 
 ## Deploying to GKE (not done)
 
@@ -178,10 +178,10 @@ The intended path, written down but not exercised:
 
 ## Known gaps
 
-- **Not production-real.** Nothing here has run on GCP. The Terraform passes static checks, but a first `apply` against a real project would very likely need fixes: API enablement timing, quotas, organisation policies.
-- **Single node.** The local cluster has one node, so zone spread, node failure and real drains cannot be tested. Drill 05 evicts every pod through the Eviction API, the way `kubectl drain` does, but without cordoning the only node.
-- **Shared resources.** The local datastores share the node and its 4 vCPUs with the workload, the monitoring stack and the load generators. Throughput numbers describe this laptop, not a capacity plan.
-- **CPU autoscaling.** The worker HPA scales on CPU. Queue lag (KEDA, see [docs/scaling.md](docs/scaling.md)) is the better signal for a job system, but it is not installed.
-- **Memorystore without AUTH or TLS.** The application's Redis client takes an address only. The trivy findings for this are suppressed inline with that reason.
-- **Rejected submissions during an outage.** When Postgres or Redis is down, the API leaves the Service after two failed readiness checks (up to 10 s). Submissions in that window, and while no endpoint is ready, fail. The drills count them. The load generator does not retry them, and a real client would need to.
-- **Local alert routing.** Alertmanager routes to a null receiver locally. Alerts were verified through the Prometheus API during the drills, not through a pager.
+- Not production-real. Nothing here has run on GCP. The Terraform passes static checks, but a first `apply` against a real project would very likely need fixes: API enablement timing, quotas, organisation policies.
+- Single node. The local cluster has one node, so zone spread, node failure and real drains cannot be tested. Drill 05 evicts every pod through the Eviction API, the way `kubectl drain` does, but without cordoning the only node.
+- Shared resources. The local datastores share the node and its 4 vCPUs with the workload, the monitoring stack and the load generators. Throughput numbers describe this laptop, not a capacity plan.
+- CPU autoscaling. The worker HPA scales on CPU. Queue lag (KEDA, see [docs/scaling.md](docs/scaling.md)) is the better signal for a job system, but it is not installed.
+- Memorystore without AUTH or TLS. The application's Redis client takes an address only. The trivy findings for this are suppressed inline with that reason.
+- Rejected submissions during an outage. When Postgres or Redis is down, the API leaves the Service after two failed readiness checks (up to 10 s). Submissions in that window, and while no endpoint is ready, fail. The drills count them. The load generator does not retry them, and a real client would need to.
+- Local alert routing. Alertmanager routes to a null receiver locally. Alerts were verified through the Prometheus API during the drills, not through a pager.

@@ -28,11 +28,11 @@ The API and worker pods accept scrapes only from the `monitoring` namespace (Net
 
 `monitoring/dashboards/audio-jobs.json`, in rows:
 
-- **Service level objectives**: the four SLIs against their targets, and the burn rate
-- **Traffic and latency**: submissions, finished jobs by status, end-to-end percentiles
-- **Queue**: depth by state, oldest unfinished job, recovery mechanisms (sweeper and retries)
-- **Capacity**: replicas against HPA bounds, CPU per pod, jobs in flight and restarts
-- **Dependencies**: datastore up, jobs by status in Postgres
+- Service level objectives: the four SLIs against their targets, and the burn rate
+- Traffic and latency: submissions, finished jobs by status, end-to-end percentiles
+- Queue: depth by state, oldest unfinished job, recovery mechanisms (sweeper and retries)
+- Capacity: replicas against HPA bounds, CPU per pod, jobs in flight and restarts
+- Dependencies: datastore up, jobs by status in Postgres
 
 To open it:
 
