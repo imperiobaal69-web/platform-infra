@@ -70,3 +70,9 @@ variable "labels" {
   type        = map(string)
   default     = {}
 }
+
+variable "iam_user_roles" {
+  description = "PostgreSQL roles granted to each IAM user, keyed by service account email."
+  type        = map(list(string))
+  default     = {}
+}

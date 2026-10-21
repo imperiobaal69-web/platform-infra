@@ -1,6 +1,6 @@
-# Production environment for audio-jobs on GKE. Written to be applied, but in
-# this repository it is only validated (fmt, validate, tflint, trivy in CI):
-# there is no GCP project behind it. See the README.
+# Production environment for audio-jobs on GKE. CI validates it on every push
+# (fmt, validate, tflint, trivy); gcp-validation/ applies it to a real project,
+# tests it and destroys it. See gcp-validation/README.md.
 
 locals {
   labels = {
@@ -57,6 +57,7 @@ module "gke" {
   node_min_count             = var.node_min_count
   node_max_count             = var.node_max_count
   etcd_kms_key               = var.etcd_kms_key
+  deletion_protection        = var.deletion_protection
   labels                     = local.labels
 }
 
@@ -88,6 +89,10 @@ module "workload_identity" {
       project_roles               = []
     }
   }
+  # The PROJECT.svc.id.goog identity pool only exists once a cluster with
+  # Workload Identity has been created; binding KSAs before that fails with
+  # "Identity Pool does not exist". Found on the first real apply.
+  depends_on = [module.gke]
 }
 
 module "artifact_registry" {
@@ -115,7 +120,14 @@ module "cloudsql" {
     module.workload_identity.emails["audio-jobs-app"],
     module.workload_identity.emails["audio-jobs-exporter"],
   ]
-  labels = local.labels
+  # The app identity also runs the migrations, so it needs to create tables.
+  # A separate migration identity would let api and worker run with DML only.
+  iam_user_roles = {
+    (module.workload_identity.emails["audio-jobs-app"])      = ["cloudsqlsuperuser"]
+    (module.workload_identity.emails["audio-jobs-exporter"]) = ["pg_monitor", "pg_read_all_data"]
+  }
+  deletion_protection = var.deletion_protection
+  labels              = local.labels
 }
 
 module "memorystore" {

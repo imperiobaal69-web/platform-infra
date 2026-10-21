@@ -77,3 +77,9 @@ variable "github_repository" {
   type        = string
   default     = "imperiobaal69-web/platform-infra"
 }
+
+variable "deletion_protection" {
+  description = "Refuse terraform destroy of the GKE cluster and the Cloud SQL instance. Keep true for production; the short-lived validation environment sets false so it can be torn down."
+  type        = bool
+  default     = true
+}

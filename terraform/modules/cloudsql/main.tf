@@ -93,6 +93,12 @@ resource "google_sql_database" "app" {
   project  = var.project_id
   instance = google_sql_database_instance.this.name
   name     = var.database_name
+
+  # The migrations make the app's IAM user the owner of the tables, and
+  # PostgreSQL will not drop a role that owns objects. Depending on the users
+  # makes destroy drop the database (and the tables in it) before them. Found
+  # when the validation environment was torn down.
+  depends_on = [google_sql_user.iam]
 }
 
 # IAM database users: the user name is the service account email without
@@ -103,4 +109,9 @@ resource "google_sql_user" "iam" {
   instance = google_sql_database_instance.this.name
   name     = trimsuffix(each.value, ".gserviceaccount.com")
   type     = "CLOUD_IAM_SERVICE_ACCOUNT"
+
+  # PostgreSQL 15+ no longer lets every role create objects in the public
+  # schema, and a new IAM user has no grants at all, so without this the
+  # migration fails with "permission denied for schema public".
+  database_roles = lookup(var.iam_user_roles, each.value, [])
 }
