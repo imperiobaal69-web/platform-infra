@@ -78,4 +78,6 @@ restart becomes a failover to the standby; that was not tested here.
 - Least privilege for migrations. The app identity holds `cloudsqlsuperuser` because it also runs the migrations; a separate migration identity would let api and worker run with data access only.
 - Alert routing to a pager, External Secrets Operator and the monitoring stack were not installed on GKE.
 
-Recorded addresses and the project ID are redacted from the results.
+Recorded addresses and the project ID are redacted from the results. The OIDC
+condition recorded in `results/checks.json` names the account's username at
+the time; the repository has since moved to `paulovillalobos/platform-infra`.

@@ -25,14 +25,14 @@ tests:
             exp_annotations:
               summary: API availability is burning its 30-day error budget too fast
               description: "100% of availability probes are failing (budget 0.5%)."
-              runbook_url: https://github.com/imperiobaal69-web/platform-infra/blob/main/docs/runbooks/error-budget-burn.md
+              runbook_url: https://github.com/paulovillalobos/platform-infra/blob/main/docs/runbooks/error-budget-burn.md
       - eval_time: 130m
         alertname: AudioJobsAPIDown
         exp_alerts:
           - exp_labels: {severity: page, job: audio-jobs-api-probe, instance: api}
             exp_annotations:
               summary: Every availability probe through the API Service failed for 2 minutes
-              runbook_url: https://github.com/imperiobaal69-web/platform-infra/blob/main/docs/runbooks/api-unavailable.md
+              runbook_url: https://github.com/paulovillalobos/platform-infra/blob/main/docs/runbooks/api-unavailable.md
 
   # A single failed probe (one scrape) burns almost nothing: no page.
   - interval: 1m
@@ -63,14 +63,14 @@ tests:
             exp_annotations:
               summary: Jobs are dying fast enough to burn the job-success error budget
               description: "4.762% of finished jobs ended dead (budget 0.1%)."
-              runbook_url: https://github.com/imperiobaal69-web/platform-infra/blob/main/docs/runbooks/job-failures.md
+              runbook_url: https://github.com/paulovillalobos/platform-infra/blob/main/docs/runbooks/job-failures.md
       - eval_time: 120m
         alertname: AudioJobsDeadLetters
         exp_alerts:
           - exp_labels: {severity: ticket, status: dead}
             exp_annotations:
               summary: Jobs exhausted their retries and were dead-lettered
-              runbook_url: https://github.com/imperiobaal69-web/platform-infra/blob/main/docs/runbooks/job-failures.md
+              runbook_url: https://github.com/paulovillalobos/platform-infra/blob/main/docs/runbooks/job-failures.md
 
   # Job success: one dead job per 1000 is inside the budget; it still opens a
   # dead-letter ticket but does not page.
@@ -115,7 +115,7 @@ tests:
             exp_annotations:
               summary: p95 end-to-end job latency is above 5.12 s
               description: "p95 over the last 10 minutes is 9.984s."
-              runbook_url: https://github.com/imperiobaal69-web/platform-infra/blob/main/docs/runbooks/job-latency.md
+              runbook_url: https://github.com/paulovillalobos/platform-infra/blob/main/docs/runbooks/job-latency.md
 
   # Latency: fast jobs never alert.
   - interval: 1m
@@ -149,7 +149,7 @@ tests:
             exp_annotations:
               summary: An accepted job has been unfinished for more than 2 minutes
               description: "Oldest unfinished job is 10m 0s old."
-              runbook_url: https://github.com/imperiobaal69-web/platform-infra/blob/main/docs/runbooks/queue-age.md
+              runbook_url: https://github.com/paulovillalobos/platform-infra/blob/main/docs/runbooks/queue-age.md
 
   # Postgres unreachable, and the exporter disappearing altogether.
   - interval: 30s
@@ -166,7 +166,7 @@ tests:
           - exp_labels: {severity: page}
             exp_annotations:
               summary: postgres-exporter cannot reach Postgres (or is not reporting)
-              runbook_url: https://github.com/imperiobaal69-web/platform-infra/blob/main/docs/runbooks/postgres-down.md
+              runbook_url: https://github.com/paulovillalobos/platform-infra/blob/main/docs/runbooks/postgres-down.md
   - interval: 30s
     input_series:
       - series: 'up{job="other"}'
@@ -178,7 +178,7 @@ tests:
           - exp_labels: {severity: page}
             exp_annotations:
               summary: postgres-exporter cannot reach Postgres (or is not reporting)
-              runbook_url: https://github.com/imperiobaal69-web/platform-infra/blob/main/docs/runbooks/postgres-down.md
+              runbook_url: https://github.com/paulovillalobos/platform-infra/blob/main/docs/runbooks/postgres-down.md
 
   # Kubernetes-state alerts.
   - interval: 30s
@@ -198,7 +198,7 @@ tests:
           - exp_labels: {severity: page, namespace: audio-jobs-data, statefulset: redis}
             exp_annotations:
               summary: The Redis pod is not ready
-              runbook_url: https://github.com/imperiobaal69-web/platform-infra/blob/main/docs/runbooks/redis-down.md
+              runbook_url: https://github.com/paulovillalobos/platform-infra/blob/main/docs/runbooks/redis-down.md
       - eval_time: 2m
         alertname: AudioJobsWorkersUnavailable
         exp_alerts: []
@@ -208,21 +208,21 @@ tests:
           - exp_labels: {severity: page, namespace: audio-jobs, deployment: worker}
             exp_annotations:
               summary: No worker pod is available; jobs are being accepted but not processed
-              runbook_url: https://github.com/imperiobaal69-web/platform-infra/blob/main/docs/runbooks/workers-unavailable.md
+              runbook_url: https://github.com/paulovillalobos/platform-infra/blob/main/docs/runbooks/workers-unavailable.md
       - eval_time: 2m
         alertname: AudioJobsRolloutStuck
         exp_alerts:
           - exp_labels: {severity: ticket, namespace: audio-jobs, deployment: api, condition: Progressing, status: "false"}
             exp_annotations:
               summary: "Rollout of api exceeded its progress deadline"
-              runbook_url: https://github.com/imperiobaal69-web/platform-infra/blob/main/docs/runbooks/bad-deploy.md
+              runbook_url: https://github.com/paulovillalobos/platform-infra/blob/main/docs/runbooks/bad-deploy.md
       - eval_time: 4m
         alertname: AudioJobsPodCrashLooping
         exp_alerts:
           - exp_labels: {severity: ticket, namespace: audio-jobs, pod: worker-abc, container: worker}
             exp_annotations:
               summary: "worker-abc restarted more than 3 times in 10 minutes"
-              runbook_url: https://github.com/imperiobaal69-web/platform-infra/blob/main/docs/runbooks/workers-unavailable.md
+              runbook_url: https://github.com/paulovillalobos/platform-infra/blob/main/docs/runbooks/workers-unavailable.md
 
   - interval: 1m
     input_series:
@@ -240,4 +240,4 @@ tests:
           - exp_labels: {severity: ticket, namespace: audio-jobs, horizontalpodautoscaler: worker}
             exp_annotations:
               summary: "worker has been at its replica ceiling for 15 minutes"
-              runbook_url: https://github.com/imperiobaal69-web/platform-infra/blob/main/docs/runbooks/capacity.md
+              runbook_url: https://github.com/paulovillalobos/platform-infra/blob/main/docs/runbooks/capacity.md

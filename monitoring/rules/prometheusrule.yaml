@@ -63,7 +63,7 @@ spec:
           annotations:
             summary: API availability is burning its 30-day error budget too fast
             description: "{{ $value | humanizePercentage }} of availability probes are failing (budget 0.5%)."
-            runbook_url: https://github.com/imperiobaal69-web/platform-infra/blob/main/docs/runbooks/error-budget-burn.md
+            runbook_url: https://github.com/paulovillalobos/platform-infra/blob/main/docs/runbooks/error-budget-burn.md
 
         - alert: AudioJobsAvailabilityBudgetBurnSlow
           expr: |
@@ -74,7 +74,7 @@ spec:
             slo: availability
           annotations:
             summary: API availability will exhaust its error budget before the 30-day window ends
-            runbook_url: https://github.com/imperiobaal69-web/platform-infra/blob/main/docs/runbooks/error-budget-burn.md
+            runbook_url: https://github.com/paulovillalobos/platform-infra/blob/main/docs/runbooks/error-budget-burn.md
 
         - alert: AudioJobsJobSuccessBudgetBurn
           expr: |
@@ -93,7 +93,7 @@ spec:
           annotations:
             summary: Jobs are dying fast enough to burn the job-success error budget
             description: "{{ $value | humanizePercentage }} of finished jobs ended dead (budget 0.1%)."
-            runbook_url: https://github.com/imperiobaal69-web/platform-infra/blob/main/docs/runbooks/job-failures.md
+            runbook_url: https://github.com/paulovillalobos/platform-infra/blob/main/docs/runbooks/job-failures.md
 
         - alert: AudioJobsJobSuccessBudgetBurnSlow
           expr: |
@@ -104,7 +104,7 @@ spec:
             slo: job-success
           annotations:
             summary: Job success will exhaust its error budget before the 30-day window ends
-            runbook_url: https://github.com/imperiobaal69-web/platform-infra/blob/main/docs/runbooks/job-failures.md
+            runbook_url: https://github.com/paulovillalobos/platform-infra/blob/main/docs/runbooks/job-failures.md
 
         - alert: AudioJobsLatencyP95High
           expr: sli:job_e2e_seconds:p95_rate10m > 5.12
@@ -115,7 +115,7 @@ spec:
           annotations:
             summary: p95 end-to-end job latency is above 5.12 s
             description: "p95 over the last 10 minutes is {{ $value | humanizeDuration }}."
-            runbook_url: https://github.com/imperiobaal69-web/platform-infra/blob/main/docs/runbooks/job-latency.md
+            runbook_url: https://github.com/paulovillalobos/platform-infra/blob/main/docs/runbooks/job-latency.md
 
         - alert: AudioJobsQueueAgeHigh
           expr: sli:queue_oldest_unfinished_age_seconds:max > 120
@@ -126,7 +126,7 @@ spec:
           annotations:
             summary: An accepted job has been unfinished for more than 2 minutes
             description: "Oldest unfinished job is {{ $value | humanizeDuration }} old."
-            runbook_url: https://github.com/imperiobaal69-web/platform-infra/blob/main/docs/runbooks/queue-age.md
+            runbook_url: https://github.com/paulovillalobos/platform-infra/blob/main/docs/runbooks/queue-age.md
 
     - name: audio-jobs-symptoms
       rules:
@@ -139,7 +139,7 @@ spec:
             severity: page
           annotations:
             summary: Every availability probe through the API Service failed for 2 minutes
-            runbook_url: https://github.com/imperiobaal69-web/platform-infra/blob/main/docs/runbooks/api-unavailable.md
+            runbook_url: https://github.com/paulovillalobos/platform-infra/blob/main/docs/runbooks/api-unavailable.md
 
         - alert: AudioJobsDeadLetters
           expr: increase(aj_jobs_finished_total{status="dead"}[15m]) > 0
@@ -147,7 +147,7 @@ spec:
             severity: ticket
           annotations:
             summary: Jobs exhausted their retries and were dead-lettered
-            runbook_url: https://github.com/imperiobaal69-web/platform-infra/blob/main/docs/runbooks/job-failures.md
+            runbook_url: https://github.com/paulovillalobos/platform-infra/blob/main/docs/runbooks/job-failures.md
 
     - name: audio-jobs-infrastructure
       rules:
@@ -158,7 +158,7 @@ spec:
             severity: page
           annotations:
             summary: postgres-exporter cannot reach Postgres (or is not reporting)
-            runbook_url: https://github.com/imperiobaal69-web/platform-infra/blob/main/docs/runbooks/postgres-down.md
+            runbook_url: https://github.com/paulovillalobos/platform-infra/blob/main/docs/runbooks/postgres-down.md
 
         # Local overlay only: on GKE Memorystore health comes from Cloud
         # Monitoring. API readiness also fails while Redis is down, which
@@ -170,7 +170,7 @@ spec:
             severity: page
           annotations:
             summary: The Redis pod is not ready
-            runbook_url: https://github.com/imperiobaal69-web/platform-infra/blob/main/docs/runbooks/redis-down.md
+            runbook_url: https://github.com/paulovillalobos/platform-infra/blob/main/docs/runbooks/redis-down.md
 
         - alert: AudioJobsWorkersUnavailable
           expr: kube_deployment_status_replicas_available{namespace="audio-jobs", deployment="worker"} < 1
@@ -179,7 +179,7 @@ spec:
             severity: page
           annotations:
             summary: No worker pod is available; jobs are being accepted but not processed
-            runbook_url: https://github.com/imperiobaal69-web/platform-infra/blob/main/docs/runbooks/workers-unavailable.md
+            runbook_url: https://github.com/paulovillalobos/platform-infra/blob/main/docs/runbooks/workers-unavailable.md
 
         - alert: AudioJobsPodCrashLooping
           expr: increase(kube_pod_container_status_restarts_total{namespace="audio-jobs"}[10m]) > 3
@@ -187,7 +187,7 @@ spec:
             severity: ticket
           annotations:
             summary: "{{ $labels.pod }} restarted more than 3 times in 10 minutes"
-            runbook_url: https://github.com/imperiobaal69-web/platform-infra/blob/main/docs/runbooks/workers-unavailable.md
+            runbook_url: https://github.com/paulovillalobos/platform-infra/blob/main/docs/runbooks/workers-unavailable.md
 
         - alert: AudioJobsRolloutStuck
           expr: kube_deployment_status_condition{namespace="audio-jobs", condition="Progressing", status="false"} == 1
@@ -195,7 +195,7 @@ spec:
             severity: ticket
           annotations:
             summary: "Rollout of {{ $labels.deployment }} exceeded its progress deadline"
-            runbook_url: https://github.com/imperiobaal69-web/platform-infra/blob/main/docs/runbooks/bad-deploy.md
+            runbook_url: https://github.com/paulovillalobos/platform-infra/blob/main/docs/runbooks/bad-deploy.md
 
         - alert: AudioJobsHPAAtMaximum
           expr: |
@@ -206,4 +206,4 @@ spec:
             severity: ticket
           annotations:
             summary: "{{ $labels.horizontalpodautoscaler }} has been at its replica ceiling for 15 minutes"
-            runbook_url: https://github.com/imperiobaal69-web/platform-infra/blob/main/docs/runbooks/capacity.md
+            runbook_url: https://github.com/paulovillalobos/platform-infra/blob/main/docs/runbooks/capacity.md

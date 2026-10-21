@@ -75,7 +75,7 @@ variable "redis_memory_gb" {
 variable "github_repository" {
   description = "Repository whose main-branch workflows may deploy (owner/name)."
   type        = string
-  default     = "imperiobaal69-web/platform-infra"
+  default     = "paulovillalobos/platform-infra"
 }
 
 variable "deletion_protection" {

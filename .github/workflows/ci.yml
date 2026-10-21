@@ -11,7 +11,7 @@ permissions:
 env:
   KUBERNETES_VERSION: 1.35.0
   # The workload under test, built from its own repository at a fixed commit.
-  AUDIO_JOBS_REPO: imperiobaal69-web/audio-jobs
+  AUDIO_JOBS_REPO: paulovillalobos/audio-jobs
   AUDIO_JOBS_REF: 9780ab2cc7f0666f7bfa479372a73666949122ac
 
 jobs:

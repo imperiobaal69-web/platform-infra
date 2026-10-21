@@ -103,7 +103,7 @@ log "GitHub OIDC trust is limited to this repository"
 cond=$(gcloud iam workload-identity-pools providers list --location=global \
   --workload-identity-pool="$(basename "$(dirname "$(dirname "$(out ci_workload_identity_provider)")")")" \
   --format='value(attributeCondition)' 2>/dev/null | head -1)
-record oidc_condition_pins_repository "$(grep -q 'imperiobaal69-web/platform-infra' <<<"$cond" && echo true || echo false)" "$cond"
+record oidc_condition_pins_repository "$(grep -q 'paulovillalobos/platform-infra' <<<"$cond" && echo true || echo false)" "$cond"
 
 log "end to end: jobs through the API on GKE"
 # The load generator's namespace ships with the local overlay only.

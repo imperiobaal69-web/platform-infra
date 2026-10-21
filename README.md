@@ -1,6 +1,6 @@
 # platform-infra
 
-Infrastructure to deploy, monitor, scale and recover [audio-jobs](https://github.com/imperiobaal69-web/audio-jobs), a Go job-processing service (HTTP API and workers on Postgres and Redis Streams):
+Infrastructure to deploy, monitor, scale and recover [audio-jobs](https://github.com/paulovillalobos/audio-jobs), a Go job-processing service (HTTP API and workers on Postgres and Redis Streams):
 
 - Kubernetes manifests (kustomize base plus `local` and `gke` overlays)
 - a Prometheus and Grafana monitoring stack, with SLO alert rules tested by promtool
