@@ -1,0 +1,64 @@
+{
+  "project": "<project>",
+  "ran_at": "2026-10-21T13:12:10Z",
+  "region": "europe-west1",
+  "checks": [
+    {
+      "check": "nodes_have_no_public_ip",
+      "passed": true,
+      "detail": "public IPs on nodes: 0"
+    },
+    {
+      "check": "control_plane_allowlist_only",
+      "passed": true,
+      "detail": "private nodes: true; authorized networks: x.x.x.x/32"
+    },
+    {
+      "check": "cloudsql_has_no_public_ip",
+      "passed": true,
+      "detail": "ipv4Enabled=false, address types=PRIVATE"
+    },
+    {
+      "check": "cloudsql_iam_users_exist",
+      "passed": true,
+      "detail": "audio-jobs-app@<project>.iam:CLOUD_IAM_SERVICE_ACCOUNT audio-jobs-exporter@<project>.iam:CLOUD_IAM_SERVICE_ACCOUNT postgres:BUILT_IN "
+    },
+    {
+      "check": "app_pods_cannot_bypass_the_proxy",
+      "passed": true,
+      "detail": "direct to 10.100.0.3:5432 from audio-jobs: psql: error: connection to server at \"10.100.0.3\", port 5432 failed: timeout expired"
+    },
+    {
+      "check": "cloudsql_rejects_logins_without_iam_token",
+      "passed": true,
+      "detail": "FATAL:  Cloud SQL IAM service account authentication failed for user \"audio-jobs-app@<project>.iam\" FATAL:  password authentication failed for user \"postgres\" "
+    },
+    {
+      "check": "wi_api_pod_is_app_service_account",
+      "passed": true,
+      "detail": "identity seen by api pod: audio-jobs-app@<project>.iam.gserviceaccount.com"
+    },
+    {
+      "check": "wi_external_secrets_can_read_its_secret",
+      "passed": true,
+      "detail": "READ_OK"
+    },
+    {
+      "check": "wi_app_cannot_read_platform_secret",
+      "passed": true,
+      "detail": "PERMISSION_DENIED: Permission 'secretmanager"
+    },
+    {
+      "check": "oidc_condition_pins_repository",
+      "passed": true,
+      "detail": "assertion.repository == \"imperiobaal69-web/platform-infra\" && assertion.ref in [\"refs/heads/main\"]"
+    },
+    {
+      "check": "smoke_jobs_processed",
+      "passed": true,
+      "detail": "smoke test passed: 30/30 jobs succeeded"
+    }
+  ],
+  "passed": 11,
+  "total": 11
+}

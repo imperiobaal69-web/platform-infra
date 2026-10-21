@@ -12,7 +12,7 @@ step() { printf '\n== %s\n' "$*"; }
 
 check_shell() {
   step "shellcheck"
-  shellcheck -x scripts/*.sh drills/*.sh k8s/overlays/local/postgres-init.sh
+  shellcheck -x scripts/*.sh drills/*.sh gcp-validation/*.sh k8s/overlays/local/postgres-init.sh
 }
 
 check_k8s() {

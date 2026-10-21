@@ -12,7 +12,7 @@ Infrastructure to deploy, monitor, scale and recover [audio-jobs](https://github
 What is real and what is not:
 
 - Real, and measured here. Everything in the local overlay runs on a single-node Kubernetes cluster (Colima with k3s on a MacBook, 4 vCPU, 6 GiB, 20 GiB disk, Kubernetes 1.35). All numbers in this README come from the drill scripts in `drills/` and are recorded in `drills/results/`.
-- Written, validated, never applied. The Terraform and the `gke` overlay describe a production-style GCP environment. CI runs `terraform fmt`, `validate`, tflint and trivy on the Terraform and kubeconform on the overlay, but there is no GCP project behind it. Nothing has been created in the cloud, and none of the cloud-specific behaviour (Cloud SQL failover, Workload Identity, Filestore) has been exercised.
+- Applied once on GCP, then destroyed. On 21 October 2026 the Terraform and the `gke` overlay were applied to a real project (sized down), audio-jobs ran on GKE, 11 checks and 2 drills passed, and everything was torn down. The first apply and teardown exposed six problems that static checks had passed; all are fixed. Details and results: [gcp-validation/](gcp-validation/README.md). CI still runs `terraform fmt`, `validate`, tflint and trivy on every push. Cloud SQL and Memorystore failover (HA) were not exercised.
 
 ## Architecture
 
@@ -167,19 +167,25 @@ Error budget alerts use multiwindow burn rates (14.4x over 1h/5m and 6x over 6h/
 - terraform: `fmt -check`, `init -backend=false` and `validate` for the bootstrap and prod configurations, tflint with the Google ruleset, and `trivy config` failing on MEDIUM or higher
 - e2e: builds the audio-jobs image from its repository at a pinned commit, creates a kind cluster (Kubernetes 1.35.8), deploys the local overlay with `scripts/deploy.sh` and runs `scripts/smoke.sh`
 
-## Deploying to GKE (not done)
+## Deploying to GKE
 
-The intended path, written down but not exercised:
+[`gcp-validation/`](gcp-validation/README.md) does it end to end against a real
+project and is how this repository was validated:
 
-1. `terraform/bootstrap`: create the state bucket.
-2. `terraform/environments/prod`: copy `backend.hcl.example` and `terraform.tfvars.example`, then run `terraform init -backend-config=backend.hcl` and `terraform apply`.
-3. Put the `terraform output` values into `k8s/overlays/gke`: image repository, Cloud SQL connection name, IAM user names, Memorystore address, private services CIDR, Google service account emails. The committed values are the ones the example tfvars would produce for the project `my-gcp-project`.
-4. Install External Secrets Operator and the monitoring stack, then run `scripts/deploy.sh gke`.
+1. `up.sh`: budget alert, state bucket (`terraform/bootstrap`), `terraform apply` of `terraform/environments/prod`, image build in Cloud Build, the `gke` overlay rendered with the `terraform output` values, deploy.
+2. `checks.sh`: private networking, Cloud SQL IAM authentication, Workload Identity and OIDC trust, each with a negative test, and an end-to-end smoke test.
+3. `drills.sh`: node loss and a Cloud SQL restart under load.
+4. `down.sh`: workload, `terraform destroy`, state bucket, then a listing of anything left.
+
+For a long-lived environment, set `deletion_protection = true` (the default),
+`db_high_availability = true` and `redis_tier = "STANDARD_HA"`, and install
+External Secrets Operator and the monitoring stack.
 
 ## Known gaps
 
-- Not production-real. Nothing here has run on GCP. The Terraform passes static checks, but a first `apply` against a real project would very likely need fixes: API enablement timing, quotas, organisation policies.
-- Single node. The local cluster has one node, so zone spread, node failure and real drains cannot be tested. Drill 05 evicts every pod through the Eviction API, the way `kubectl drain` does, but without cordoning the only node.
+- Validated once, not operated. The GCP environment existed for about three hours, sized down and without HA. It shows the design works and recovers from a lost node and a database restart; it says nothing about running it for months, upgrades or cost at scale.
+- Migration identity. The app's database identity holds `cloudsqlsuperuser` because the same identity runs the migrations. A separate migration identity would let api and worker run with data access only.
+- Single node locally. The local cluster has one node, so zone spread and real drains cannot be tested there; node failure was tested on GKE. Drill 05 evicts every pod through the Eviction API, the way `kubectl drain` does, but without cordoning the only node.
 - Shared resources. The local datastores share the node and its 4 vCPUs with the workload, the monitoring stack and the load generators. Throughput numbers describe this laptop, not a capacity plan.
 - CPU autoscaling. The worker HPA scales on CPU. Queue lag (KEDA, see [docs/scaling.md](docs/scaling.md)) is the better signal for a job system, but it is not installed.
 - Memorystore without AUTH or TLS. The application's Redis client takes an address only. The trivy findings for this are suppressed inline with that reason.
