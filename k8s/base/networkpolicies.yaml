@@ -18,11 +18,16 @@ spec:
   podSelector: {}
   policyTypes: [Egress]
   egress:
+    # kube-dns, and node-local-dns when NodeLocal DNSCache is on (the GKE
+    # cluster enables it): there pods' queries to the kube-dns Service IP are
+    # answered by the node-local-dns pods, so allowing only kube-dns times out
+    # every lookup. Found on the first deploy to GKE.
     - to:
         - namespaceSelector:
             matchLabels: {kubernetes.io/metadata.name: kube-system}
           podSelector:
-            matchLabels: {k8s-app: kube-dns}
+            matchExpressions:
+              - {key: k8s-app, operator: In, values: [kube-dns, node-local-dns]}
       ports:
         - {protocol: UDP, port: 53}
         - {protocol: TCP, port: 53}

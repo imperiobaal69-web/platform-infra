@@ -3,15 +3,16 @@
 # Redis is Memorystore, uploads live on Filestore, and every component runs
 # as its own Google service account through Workload Identity.
 #
-# Not applied anywhere: CI builds it with kustomize and validates the output
-# with kubeconform. The values in environment.env are what
-# `terraform output` prints for the example tfvars; replace them for a real
-# project (see README, "Deploying to GKE").
+# CI builds it with kustomize and validates the output with kubeconform. The
+# committed values are placeholders for the project "my-gcp-project";
+# gcp-validation/up.sh renders them from `terraform output` and deploys it
+# (see gcp-validation/README.md).
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
   - ../../base
   - egress.yaml
+  - storageclass.yaml
 secretGenerator:
   # DATABASE_URL carries no password: the proxy authenticates as the pod's
   # Google service account (IAM database authentication). The Secret exists
@@ -31,11 +32,11 @@ patches:
   - target: {kind: ConfigMap, name: audio-jobs}
     patch: |-
       - {op: replace, path: /data/REDIS_ADDR, value: "10.100.0.3:6379"}
-  # Filestore (basic HDD) through the GKE Filestore CSI driver; 1 TiB is
-  # the smallest basic HDD instance.
+  # Filestore (basic HDD) through the GKE Filestore CSI driver, on the
+  # cluster's VPC (storageclass.yaml); 1 TiB is the smallest basic HDD instance.
   - target: {kind: PersistentVolumeClaim, name: blobs}
     patch: |-
-      - {op: add, path: /spec/storageClassName, value: standard-rwx}
+      - {op: add, path: /spec/storageClassName, value: filestore-private}
       - {op: replace, path: /spec/resources/requests/storage, value: 1Ti}
   # Spread replicas over the region's zones so one zone outage leaves
   # capacity in the others.
